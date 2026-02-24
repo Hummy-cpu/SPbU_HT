@@ -1,0 +1,62 @@
+#r "nuget: NUnit"
+#r "nuget: FsUnit"
+#r "nuget: Microsoft.NET.Test.Sdk"
+
+open System
+open NUnit.Framework
+open FsUnit
+
+type Expression =
+    | Number of int
+    | Add of Expression * Expression
+    | Subtract of Expression * Expression
+    | Multiply of Expression * Expression
+    | Divide of Expression * Expression
+let rec evaluate expr =
+    match expr with
+    | Number(n) -> n
+    | Add(left, right) -> (evaluate left) + (evaluate right)
+    | Subtract(left, right) -> (evaluate left) - (evaluate right)
+    | Multiply(left, right) -> (evaluate left) * (evaluate right)
+    | Divide(left, right) -> (evaluate left) / (evaluate right)
+[<Test>]
+let ``Add Test`` () =
+    let expr = Add(Number(3), Number(4))
+    evaluate expr |> should equal 7
+
+[<Test>]
+let ``Subtract Test`` () =
+    let expr = Subtract(Number(10), Number(4))
+    evaluate expr |> should equal 6
+
+[<Test>]
+let ``Multiply Test`` () =
+    let expr = Multiply(Number(3), Number(4))
+    evaluate expr |> should equal 12
+
+[<Test>]
+let ``Divide Test`` () =
+    let expr = Divide(Number(10), Number(2))
+    evaluate expr |> should equal 5
+
+[<Test>]
+let ``(2 + 3) * 4`` () =
+    let expr = Multiply(Add(Number(2), Number(3)), Number(4))
+    evaluate expr |> should equal 20
+
+[<Test>]
+let ``(10 - 3) * (8 / 2)`` () =
+    let expr = Multiply(
+                Subtract(Number(10), Number(3)), 
+                Divide(Number(8), Number(2)))
+    evaluate expr |> should equal 28
+
+[<Test>]
+let ``Without () - 2 + 3 * 4`` () =
+    let expr = Add(Number(2), Multiply(Number(3), Number(4)))
+    evaluate expr |> should equal 14
+
+[<Test>]
+let ``/0 - !?`` () =
+    let expr = Divide(Number(10), Number(0))
+    (fun () -> evaluate expr |> ignore) |> should throw typeof<DivideByZeroException>
