@@ -1,0 +1,33 @@
+#r "nuget: NUnit"
+#r "nuget: FsUnit"
+#r "nuget: Microsoft.NET.Test.Sdk"
+
+open NUnit.Framework
+open FsUnit
+type Tree<'a> = 
+    | Leaf
+    | Node of 'a * Tree<'a> * Tree<'a>
+let rec map f tree =
+    match tree with
+    | Leaf -> Leaf
+    | Node(x, left, right) -> Node(f x, map f left, map f right)
+[<Test>]
+let ``Zero Tree`` () =
+    map (fun x -> x * 2) Leaf |> should equal Leaf
+[<Test>]
+let ``Single node tree`` () =
+    let tree = Node(5, Leaf, Leaf)
+    let result = map (fun x -> x * 2) tree
+    result |> should equal (Node(10, Leaf, Leaf))
+[<Test>]
+let ``Test1`` () =
+    //            2
+    //           / \
+    //          1   3
+    let tree = Node(2, Node(1, Leaf, Leaf), Node(3, Leaf, Leaf))
+    let result = 
+        map (fun x -> x * 10) tree
+    //             20
+    //            /  \
+    //          10    30
+    result |> should equal (Node(20, Node(10, Leaf, Leaf), Node(30, Leaf, Leaf)))
