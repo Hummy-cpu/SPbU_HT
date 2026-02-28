@@ -1,0 +1,32 @@
+#r "nuget: NUnit"
+#r "nuget: FsUnit"
+#r "nuget: Microsoft.NET.Test.Sdk"
+
+open System
+open NUnit.Framework
+open FsUnit
+
+let powersOfTwo n m =
+    if m < 0 then []
+    else
+        Seq.unfold (fun (cur, i) -> 
+            if i > m then None
+            else Some (cur, (cur <<< 1, i + 1))
+        ) (1 <<< n, 0)
+        |> Seq.toList
+
+[<Test>]
+let ``n=0, m=5 -> [1;2;4;8;16;32]`` () =
+    powersOfTwo 0 5 |> should equal [1; 2; 4; 8; 16; 32]
+
+[<Test>]
+let ``n=3, m=4 -> [8;16;32;64;128]`` () =
+    powersOfTwo 3 4 |> should equal [8; 16; 32; 64; 128]
+
+[<Test>]
+let ``m=0 -> один элемент`` () =
+    powersOfTwo 5 0 |> should equal [32]
+
+[<Test>]
+let ``[] if m < 0`` () =
+    powersOfTwo 5 -1 |> should be Empty
