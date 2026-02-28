@@ -1,0 +1,31 @@
+#r "nuget: NUnit"
+#r "nuget: FsUnit"
+#r "nuget: Microsoft.NET.Test.Sdk"
+
+open System
+open NUnit.Framework
+open FsUnit
+
+let tryFindIndex value list =
+    let rec loop i = function
+        | [] -> None  
+        | head :: _ when head = value -> Some i  
+        | _ :: tail -> loop (i + 1) tail  
+    
+    loop 0 list
+
+match tryFindIndex 5 [1; 2; 3; 4; 5] with
+| Some index -> printfn "Найден на позиции %d" index
+| None -> printfn "Элемент не найден"
+
+[<Test>]
+let ``элемент найден -> index`` () =
+    tryFindIndex 3 [1; 2; 3; 4; 5] |> should equal (Some 2)
+    
+[<Test>]
+let ``элемент не найден -> None`` () =
+    tryFindIndex 10 [1; 2; 3; 4; 5] |> should equal None
+    
+[<Test>]
+let ``пустой список -> None`` () =
+    tryFindIndex 5 [] |> should equal None
