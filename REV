@@ -1,0 +1,42 @@
+#r "nuget: NUnit"
+#r "nuget: FsUnit"
+#r "nuget: Microsoft.NET.Test.Sdk"
+
+open System
+open NUnit.Framework
+open FsUnit
+let rev list =
+    let rec loop acc = function
+        | [] -> acc
+        | h :: t -> loop (h :: acc) t
+    loop [] list
+
+[<Test>]
+let ``empty`` () =
+    rev [] |> should be Empty
+
+[<Test>]
+let ``single`` () =
+    rev [5] |> should equal [5]
+
+[<Test>]
+let ``multiple`` () =
+    rev [1; 2; 3; 4; 5] |> should equal [5; 4; 3; 2; 1]
+
+[<Test>]
+let ``duplicates`` () =
+    rev [1; 1; 2; 2; 3] |> should equal [3; 2; 2; 1; 1]
+
+[<Test>]
+let ``strings`` () =
+    rev ["a"; "b"; "c"] |> should equal ["c"; "b"; "a"]
+
+[<Test>]
+let ``twice`` () =
+    let orig = [1; 2; 3; 4; 5]
+    orig |> rev |> rev |> should equal orig
+
+[<Test>]
+let ``length`` () =
+    let orig = [1; 2; 3; 4; 5]
+    (rev orig).Length |> should equal orig.Length
