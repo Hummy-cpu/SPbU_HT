@@ -1,0 +1,29 @@
+#r "nuget: NUnit"
+#r "nuget: FsUnit"
+#r "nuget: Microsoft.NET.Test.Sdk"
+
+open System
+open NUnit.Framework
+open FsUnit
+
+let factorial n =
+    if n < 0 then
+        failwith "Ошибка ОДЗ"
+    else
+        let rec loop acc i =
+            if i <= 1 then acc
+            else loop (acc * i) (i - 1)
+        loop 1 n
+
+
+[<Test>]
+let ``0!`` () =
+    factorial 0 |> should equal 1
+
+[<Test>]
+let ``5! = 120`` () =
+    factorial 5 |> should equal 120
+
+[<Test>]
+let ``Z-`` () =
+    (fun () -> factorial -1 |> ignore) |> should throw typeof<Exception>
