@@ -1,0 +1,40 @@
+#r "nuget: NUnit"
+#r "nuget: FsUnit"
+#r "nuget: Microsoft.NET.Test.Sdk"
+#r "nuget: FsCheck"
+#r "nuget: FsCheck.NUnit"
+
+open System
+open NUnit.Framework
+open FsUnit
+
+let fib n =
+    if n < 0 then None
+    else
+        let rec loop a b = function
+            | 0 -> a
+            | i -> loop b (a + b) (i - 1)
+        Some (loop 0 1 n)
+
+[<Test>]
+let ``base cases`` () =
+    fib 0 |> should equal (Some 0)
+    fib 1 |> should equal (Some 1)
+
+[<Test>]
+let ``first 10`` () =
+    let expected = [0; 1; 1; 2; 3; 5; 8; 13; 21; 34]
+    let actual = [0..9] |> List.map fib |> List.choose id
+    actual |> should equal expected
+
+[<Test>]
+let ``identity`` () = // F(n-1)*F(n+1) - F(n)^2 = (-1)^n
+    let n = 10
+    match fib (n-1), fib n, fib (n+1) with
+    | Some a, Some b, Some c -> (a * c - b * b) |> should equal (pown -1 n)
+    | _ -> Assert.Fail()
+
+[<Test>]
+let ``negative input`` () =
+    fib -1 |> should equal None
+    fib -5 |> should equal None
