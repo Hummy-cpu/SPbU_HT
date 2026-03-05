@@ -1,0 +1,179 @@
+#r "nuget: NUnit"
+#r "nuget: FsUnit"
+#r "nuget: Microsoft.NET.Test.Sdk"
+#r "nuget: FsCheck"
+#r "nuget: FsCheck.NUnit"
+
+open System
+open NUnit.Framework
+open FsUnit
+open FsCheck
+
+type Term =
+    | Var of string
+    | App of Term * Term
+    | Lam of string * Term
+
+let rec freeVars = function
+    | Var x -> Set.singleton x
+    | App(t1, t2) -> Set.union (freeVars t1) (freeVars t2)
+    | Lam(x, t) -> Set.remove x (freeVars t)
+
+let freshVar used =
+    let rec loop i =
+        let name = "x" + string i
+        if Set.contains name used then loop (i + 1)
+        else name
+    loop 0
+
+let rec toString = function
+    | Var x -> x
+    | App(t1, t2) -> sprintf "(%s %s)" (toString t1) (toString t2)
+    | Lam(x, t) -> sprintf "λ%s.%s" x (toString t)
+
+let print t = printfn "%s" (toString t)
+
+let rec alpha newX = function
+    | Var y -> Var y
+    | App(t1, t2) -> App(alpha newX t1, alpha newX t2)
+    | Lam(x, body) when x = newX -> failwith "same name"
+    | Lam(x, body) ->
+        let rec replace old newN = function
+            | Var y when y = old -> Var newN
+            | Var y -> Var y
+            | App(a, b) -> App(replace old newN a, replace old newN b)
+            | Lam(y, b) when y = old -> Lam(newN, replace old newN b)
+            | Lam(y, b) -> Lam(y, replace old newN b)
+        Lam(newX, replace x newX body)
+
+let rec subst x s = function
+    | Var y when y = x -> s
+    | Var y -> Var y
+    | App(t1, t2) -> App(subst x s t1, subst x s t2)
+    | Lam(y, body) when y = x -> Lam(y, body)
+    | Lam(y, body) ->
+        let freeS = freeVars s
+        if Set.contains y freeS then
+            let used = Set.union (freeVars body) freeS |> Set.add x
+            let z = freshVar used
+            let newBody = subst y (Var z) body
+            Lam(z, subst x s newBody)
+        else
+            Lam(y, subst x s body)
+
+let rec beta = function
+    | App(Lam(x, body), arg) -> Some (subst x arg body)
+    | App(t1, t2) ->
+        match beta t1 with
+        | Some t1' -> Some (App(t1', t2))
+        | None ->
+            match beta t2 with
+            | Some t2' -> Some (App(t1, t2'))
+            | None -> None
+    | Lam(x, t) ->
+        match beta t with
+        | Some t' -> Some (Lam(x, t'))
+        | None -> None
+    | Var _ -> None
+
+let rec norm t =
+    match beta t with
+    | Some t' -> norm t'
+    | None -> t
+
+let rec normTrace t step =
+    printfn "step %d: %s" step (toString t)
+    match beta t with
+    | Some t' -> normTrace t' (step + 1)
+    | None -> 
+        printfn "normal form: %s" (toString t)
+        t
+
+module C =
+    let I = Lam("x", Var "x")
+    let K = Lam("x", Lam("y", Var "x"))
+    let KI = Lam("x", Lam("y", Var "y"))
+    let ω = Lam("x", App(Var "x", Var "x"))
+    let Ω = App(ω, ω)
+    let Y = Lam("f", 
+                App(
+                    Lam("x", App(Var "f", App(Var "x", Var "x"))),
+                    Lam("x", App(Var "f", App(Var "x", Var "x")))
+                ))
+
+module Ex =
+    open C
+    
+    let ex1 = App(I, Var "y")
+    let ex2 = App(App(K, Var "a"), Var "b")
+    let ex3 = App(K, Var "y")
+    let ex4 = App(ω, I)
+    let ex5 = App(Lam("x", Lam("y", App(Var "x", Var "y"))), Var "y")
+    
+    let run() =
+        printfn "=== 1: (λx.x) y ==="
+        normTrace ex1 1 |> ignore
+        
+        printfn "\n=== 2: (λx.λy.x) a b ==="
+        normTrace ex2 1 |> ignore
+        
+        printfn "\n=== 3: (λx.λy.x) y ==="
+        normTrace ex3 1 |> ignore
+        
+        printfn "\n=== 4: (λx.x x) (λx.x) ==="
+        normTrace ex4 1 |> ignore
+        
+        printfn "\n=== 5: (λx.λy.x y) y ==="
+        normTrace ex5 1 |> ignore
+
+[<Test>]
+let ``freeVars: Var`` () =
+    freeVars (Var "x") |> should equal (Set ["x"])
+
+[<Test>]
+let ``freeVars: App`` () =
+    freeVars (App(Var "x", Var "y")) |> should equal (Set ["x"; "y"])
+
+[<Test>]
+let ``freeVars: Lam`` () =
+    freeVars (Lam("x", App(Var "x", Var "y"))) |> should equal (Set ["y"])
+
+[<Test>]
+let ``alpha conversion`` () =
+    let t = Lam("x", App(Var "x", Var "y"))
+    let res = alpha "z" t
+    res |> should equal (Lam("z", App(Var "z", Var "y")))
+
+[<Test>]
+let ``subst no capture`` () =
+    let t = Lam("x", Var "y")
+    let res = subst "y" (Var "z") t
+    res |> should equal (Lam("x", Var "z"))
+
+[<Test>]
+let ``subst with capture`` () =
+    let t = Lam("x", Var "y")
+    let res = subst "y" (Var "x") t
+    match res with
+    | Lam(z, Var "x") -> 
+        z |> should not' (equal "x")
+        z |> should not' (equal "y")
+    | _ -> failwith "@Wrong"
+
+[<Test>]
+let ``beta: I x = x`` () =
+    let t = App(C.I, Var "y")
+    norm t |> should equal (Var "y")
+
+[<Test>]
+let ``beta: K a b = a`` () =
+    let t = App(App(C.K, Var "a"), Var "b")
+    norm t |> should equal (Var "a")
+
+[<Test>]
+let ``beta: K y with alpha`` () =
+    let t = App(C.K, Var "y")
+    match norm t with
+    | Lam(z, Var "y") -> 
+        z |> should not' (equal "y")
+    | _ -> failwith "Wrong"
